@@ -137,3 +137,6 @@ tbody tr[data-selected="true"] { background: color-mix(in srgb, var(--accent) 8%
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+#sim label{display:flex;flex-direction:column;gap:4px}
+#sim input{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;min-width:0}

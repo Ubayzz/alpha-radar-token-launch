@@ -293,6 +293,43 @@
     );
   }
 
+
+  // Scenario calculator. Every input is the reader's own assumption; nothing here is a forecast.
+  // value_if_issued = implied_value x pool% x (capital / (TVL + capital)) ; cost = capital x opp.rate x days/365 + gas x actions.
+  function farmSimulator(row) {
+    var inputs = { capital: 10000, pool: 5, days: 60, rate: 5, gas: 4, actions: 12 };
+    var box = el('section', { class: 'detail-section', id: 'sim' }, el('h3', { text: 'Farming scenario calculator' }));
+    box.appendChild(el('p', { class: 'sub', text: 'Edit the assumptions. Defaults are placeholders, not data. The protocol may never issue a token, and make.fun does not claim these values.' }));
+    var out = el('div', { class: 'equation', 'aria-live': 'polite' });
+    var fields = el('div', { class: 'equation' });
+    function usd(n) { return fmtUsd(Math.round(n)); }
+    function calc() {
+      var share = inputs.capital / (row.tvl_usd + inputs.capital);
+      var cost = inputs.capital * (inputs.rate / 100) * (inputs.days / 365) + inputs.gas * inputs.actions;
+      var rows = [['Low', row.implied_low_usd], ['Mid', row.implied_value_usd], ['High', row.implied_high_usd]].map(function (x) {
+        var gross = x[1] * (inputs.pool / 100) * share;
+        return { name: x[0], gross: gross, net: gross - cost };
+      });
+      var be = share > 0 ? cost / (row.implied_value_usd * share) * 100 : 0;
+      out.textContent = '';
+      out.appendChild(el('div', null, el('span', { text: 'Your share of TVL' }), el('b', { class: 'num', text: (share * 100).toFixed(4) + '%' })));
+      out.appendChild(el('div', null, el('span', { text: 'Total cost (capital lock + gas)' }), el('b', { class: 'num', text: usd(cost) })));
+      rows.forEach(function (r) {
+        out.appendChild(el('div', null, el('span', { text: r.name + ' case, net of cost' }), el('b', { class: 'num', text: (r.net < 0 ? '-' : '') + usd(Math.abs(r.net)) })));
+      });
+      out.appendChild(el('div', null, el('span', { text: 'Break-even pool (mid case)' }), el('b', { class: 'num', text: be.toFixed(2) + '% of implied value' })));
+    }
+    [['capital', 'Capital deployed (USD)'], ['pool', 'Airdrop pool, % of implied value'], ['days', 'Days capital is locked'], ['rate', 'Opportunity cost, % a year'], ['gas', 'Fee per action (USD)'], ['actions', 'Number of actions']].forEach(function (f) {
+      var input = el('input', { type: 'number', min: '0', step: 'any', value: String(inputs[f[0]]), 'aria-label': f[1] });
+      input.addEventListener('input', function () { var v = parseFloat(input.value); inputs[f[0]] = isFinite(v) && v >= 0 ? v : 0; calc(); });
+      fields.appendChild(el('label', null, el('span', { text: f[1] }), input));
+    });
+    box.appendChild(fields);
+    box.appendChild(out);
+    calc();
+    return box;
+  }
+
   var dialog = el('dialog', { class: 'detail', id: 'detail', 'aria-labelledby': 'detail-title' });
   dialog.addEventListener('close', function () { state.selected = null; writeHash(); });
 
@@ -334,6 +371,7 @@
       el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
       el('p', { class: 'sub', text: 'Low and high come from the spread of market cap to TVL among protocols that already have a token in this snapshot (' + DATA.calibration.n + ' protocols). Leave-one-out tests of that spread covered the true ratio ' + DATA.calibration.loo_coverage_pct + '% of the time inside P25 to P75, and within 2x of the median ' + DATA.calibration.loo_within_2x_pct + '% of the time. The band is wide because the spread is wide.' })
     ));
+    dialog.appendChild(farmSimulator(row));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
       el('ol', { class: 'steps' }, steps.map(function (s) {
