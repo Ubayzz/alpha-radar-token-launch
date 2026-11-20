@@ -3,13 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar: pre-token protocols ranked by implied value</title>
+<meta name="theme-color" content="#090f19">
+<title>ALPHA RADAR | Pre-Token Intelligence</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<main id="board" tabindex="-1" aria-busy="true"></main>
+<a class="skip" href="#board">Skip to intelligence board</a>
+<div class="workspace">
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <div class="identity">
+      <div class="identity-mark" aria-hidden="true"><span>A</span><i></i></div>
+      <div class="identity-copy"><strong>ALPHA<span>RADAR</span></strong><small>PRE-TOKEN INTELLIGENCE</small></div>
+    </div>
+    <div class="system-card"><span class="micro-label">RESEARCH ENVIRONMENT</span><div class="system-state"><i aria-hidden="true"></i> Offline / self-contained</div><span class="system-detail">Snapshot-based intelligence</span></div>
+    <div class="side-group-label">EXPLORE</div>
+    <nav class="side-menu" aria-label="Sections">
+      <button type="button" class="side-link active" data-scroll="radar-kpis"><span class="nav-glyph glyph-grid" aria-hidden="true"></span> Overview <span class="nav-index">01</span></button>
+      <button type="button" class="side-link" data-scroll="radar-table"><span class="nav-glyph glyph-list" aria-hidden="true"></span> Intelligence board <span class="nav-index">02</span></button>
+      <button type="button" class="side-link" data-scroll="radar-model"><span class="nav-glyph glyph-graph" aria-hidden="true"></span> Model methodology <span class="nav-index">03</span></button>
+      <button type="button" class="side-link" data-scroll="radar-coverage"><span class="nav-glyph glyph-layer" aria-hidden="true"></span> Coverage & risk <span class="nav-index">04</span></button>
+    </nav>
+    <div class="side-spacer"></div>
+    <div class="side-research"><span class="micro-label">RESEARCH NOTE 001</span><strong>Confidence matters more than conviction.</strong><p>Estimates are not market prices. Signal scores are not token issuance probabilities.</p><span class="note-line"></span><small>MODEL RISK: HIGH · SNAPSHOT ONLY</small></div>
+    <div class="sidebar-footer">ALPHA RADAR <span> / </span> QUANT LAB</div>
+  </aside>
+  <div class="content-area">
+    <div class="workspace-bar">
+      <div class="breadcrumb"><span>RESEARCH DESK</span><b>/</b><strong>Intelligence Board</strong></div>
+      <div class="bar-right"><span class="quiet-pill"><i aria-hidden="true"></i> LOCAL DATA</span><span class="bar-date" id="snapshot-date">SNAPSHOT</span><span class="profile-mark" aria-label="Alpha Radar">AR</span></div>
+    </div>
+    <main id="board" tabindex="-1" aria-busy="true"></main>
+    <footer class="workspace-footer"><span>ALPHA RADAR / RESEARCH-GRADE INTERFACE</span><span>NO NETWORK · NO PROMISES · VERIFIABLE SNAPSHOT</span></footer>
+  </div>
+</div>
 <script src="../data.js"></script>
 <script src="app.js"></script>
+<script src="insights.js"></script>
 </body>
 </html>
