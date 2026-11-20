@@ -324,6 +324,17 @@
       el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ': the same function scores every protocol. The page recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + (impliedOf(row, DATA.model) === row.implied_value_usd ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
     ));
     dialog.appendChild(el('section', { class: 'detail-section' },
+      el('h3', { text: 'Sensitivity range and signal' }),
+      el('div', { class: 'equation' },
+        el('div', null, el('span', { text: 'Low (P25 of token ratios)' }), el('b', { class: 'num', text: fmtUsd(row.implied_low_usd) })),
+        el('div', null, el('span', { text: 'Mid (model)' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
+        el('div', null, el('span', { text: 'High (P75 of token ratios)' }), el('b', { class: 'num', text: fmtUsd(row.implied_high_usd) })),
+        el('div', null, el('span', { text: 'Signal score (0-100)' }), el('b', { class: 'num', text: String(row.signal_score) }))
+      ),
+      el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
+      el('p', { class: 'sub', text: 'Low and high come from the spread of market cap to TVL among protocols that already have a token in this snapshot (' + DATA.calibration.n + ' protocols). Leave-one-out tests of that spread covered the true ratio ' + DATA.calibration.loo_coverage_pct + '% of the time inside P25 to P75, and within 2x of the median ' + DATA.calibration.loo_within_2x_pct + '% of the time. The band is wide because the spread is wide.' })
+    ));
+    dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
       el('ol', { class: 'steps' }, steps.map(function (s) {
         var at = s.indexOf(' Cost: ');
