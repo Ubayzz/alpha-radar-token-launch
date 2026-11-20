@@ -340,8 +340,8 @@
       input.addEventListener('input', function () { var v = parseFloat(input.value); inputs[f[0]] = isFinite(v) && v >= 0 ? v : 0; calc(); });
       fields.appendChild(el('label', null, el('span', { text: f[1] }), input));
     });
-    box.appendChild(fields);
     box.appendChild(out);
+    box.appendChild(fields);
     calc();
     return box;
   }
@@ -364,32 +364,36 @@
       ),
       el('button', { class: 'close', type: 'button', 'aria-label': 'Close details', text: 'Close', onclick: function () { dialog.close(); } })
     ));
-    dialog.appendChild(el('section', { class: 'detail-section' },
-      el('h3', { text: 'Implied value' }),
+    var valuation = el('section', { class: 'detail-section detail-card' },
+      el('h3', { text: 'Model E valuation' }),
       el('div', { class: 'equation' },
+        el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
         el('div', null, el('span', { text: 'TVL' }), el('b', { class: 'num', text: fmtUsd(row.tvl_usd) })),
-        el('div', null, el('span', { text: 'log(TVL)' }), el('b', { class: 'num', text: String(row.log_tvl) })),
-        el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) }))
+        el('div', null, el('span', { text: 'Signal score (0–100)' }), el('b', { class: 'num', text: String(row.signal_score) }))
       ),
-      el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ': the same function scores every protocol. The page recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + (impliedOf(row, DATA.model) === row.implied_value_usd ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
-    ));
-    dialog.appendChild(el('section', { class: 'detail-section' },
-      el('h3', { text: 'Sensitivity range and signal' }),
+      el('p', { class: 'sub', text: 'Estimate, not a price or a promise of token issuance.' })
+    );
+    var range = el('section', { class: 'detail-section detail-card' },
+      el('h3', { text: 'Uncertainty range' }),
       el('div', { class: 'equation' },
-        el('div', null, el('span', { text: 'Low (exp P25 residual)' }), el('b', { class: 'num', text: fmtUsd(row.implied_low_usd) })),
-        el('div', null, el('span', { text: 'Mid (model)' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
-        el('div', null, el('span', { text: 'High (exp P75 residual)' }), el('b', { class: 'num', text: fmtUsd(row.implied_high_usd) })),
-        el('div', null, el('span', { text: 'Signal score (0-100)' }), el('b', { class: 'num', text: String(row.signal_score) }))
+        el('div', null, el('span', { text: 'Low · P25 residual' }), el('b', { class: 'num', text: fmtUsd(row.implied_low_usd) })),
+        el('div', null, el('span', { text: 'Mid · Model E' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
+        el('div', null, el('span', { text: 'High · P75 residual' }), el('b', { class: 'num', text: fmtUsd(row.implied_high_usd) }))
       ),
-      el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
-      el('p', { class: 'sub', text: 'Low and high scale the model value by exp(P25) and exp(P75) of the log residuals from the ' + DATA.calibration.n + ' token-bearing protocols in this snapshot (Model E band). Model E leave-one-out refit: within 2× of the true value ' + DATA.calibration.e_loo_within_2x_pct + '% of the time, inside the P25–P75 band ' + DATA.calibration.e_loo_p25_p75_cov_pct + '% of the time, mean absolute log error ' + DATA.calibration.e_loo_mae_log.toFixed(3) + '.' })
-    ));
-    dialog.appendChild(el('section', { class: 'detail-section risk-section' },
-      el('h3', { text: 'Risk profile' }),
-      el('p', { class: 'sub', text: 'Data-derived ' + row.risk_level + ' risk context. These flags describe where the snapshot or calibration is thin; they do not change rank or imply token issuance.' }),
-      row.risk_flags.length ? el('ul', { class: 'risk-flags' }, row.risk_flags.map(function (flag) { return el('li', { text: flag }); })) : el('p', { class: 'sub', text: 'No additional snapshot risk flags were raised for this protocol.' })
-    ));
+      el('p', { class: 'sub', text: 'Signal: ' + row.signal_note + '. It is not a calibrated probability.' })
+    );
+    var risk = el('section', { class: 'detail-section risk-section detail-card' },
+      el('h3', { text: 'Risk profile · ' + row.risk_level }),
+      row.risk_flags.length ? el('ul', { class: 'risk-flags' }, row.risk_flags.map(function (flag) { return el('li', { text: flag }); })) : el('p', { class: 'sub', text: 'No additional snapshot risk flags were raised.' }),
+      el('p', { class: 'sub', text: 'Flags are context only; they do not change rank or imply an airdrop.' })
+    );
+    var summary = el('div', { class: 'detail-grid' }, valuation, range, risk);
+    dialog.appendChild(summary);
     dialog.appendChild(farmSimulator(row));
+    dialog.appendChild(el('details', { class: 'detail-method' },
+      el('summary', { text: 'Model validation & methodology' }),
+      el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ' recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + '. The P25–P75 range comes from log residuals on ' + DATA.calibration.n + ' token-bearing protocols. Leave-one-out: within 2× ' + DATA.calibration.e_loo_within_2x_pct + '%, P25–P75 coverage ' + DATA.calibration.e_loo_p25_p75_cov_pct + '%, MAE ' + DATA.calibration.e_loo_mae_log.toFixed(3) + '. Snapshot-only validation is not evidence of future issuance.' })
+    ));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
       el('ol', { class: 'steps' }, steps.map(function (s) {
