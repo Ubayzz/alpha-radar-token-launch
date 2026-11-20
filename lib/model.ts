@@ -73,7 +73,8 @@ export const EARLY_ROWS = 400;
 export const LIVE_ROWS = 24;
 
 /** A farm step: the action, what it costs, and how long it takes. */
-import { BASE_MULTIPLE_BAND, signalScore } from './signal.ts';
+import { signalScore } from './signal.ts';
+import { calibrate, type Calibration } from './calibrate.ts';
 
 export interface FarmStep {
   text: string;
@@ -156,6 +157,7 @@ export interface RadarData {
   live_size: number;
   rows: RadarRow[];
   live: LiveRow[];
+  calibration: Calibration;
 }
 
 /** Why the snapshot is not one this model can score. */
@@ -222,7 +224,7 @@ export interface BoardSummary {
 }
 
 /** The protocols the board ranks, strongest first, with ranks 1..n. */
-export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): BoardRow[] {
+export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, cal: Calibration = calibrate(snapshot.protocols)): BoardRow[] {
   const index = bySlug(snapshot.protocols);
   const chosen = new Map<string, SnapshotProtocol>();
   // The watchlist is the floor: every slug, even one the snapshot no longer carries (it cannot, but the
@@ -242,8 +244,8 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
   const scored = [...chosen.values()].map((p) => {
     const { implied, growthPct, growthMult, maturityMult, age } = impliedValue(p, snapshot.as_of, model);
     const sig = signalScore(p, age);
-    const scale = implied / BASE_MULTIPLE_BAND.mid;
-    return { p, implied, growthPct, growthMult, maturityMult, age, sig, lo: Math.max(1, Math.round(scale * BASE_MULTIPLE_BAND.low / 1)), hi: Math.max(1, Math.round(scale * BASE_MULTIPLE_BAND.high / 1)) };
+    const scale = implied / model.base_multiple;
+    return { p, implied, growthPct, growthMult, maturityMult, age, sig, lo: Math.max(1, Math.round(scale * cal.q25)), hi: Math.max(1, Math.round(scale * cal.q75)) };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   return scored.map((s, i) => ({
@@ -409,7 +411,9 @@ export function radarRow(row: BoardRow): RadarRow {
 
 /** Everything the dashboard renders, from the snapshot. */
 export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): { board: BoardRow[]; radar: RadarData } {
-  const board = buildBoard(snapshot, model);
+  const cal = calibrate(snapshot.protocols);
+  model = { ...model, base_multiple: Math.round(cal.median * 1e4) / 1e4 };
+  const board = buildBoard(snapshot, model, cal);
   const live = liveRows(snapshot);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
   const radar: RadarData = {
@@ -424,6 +428,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     live_size: live.length,
     rows: board.map(radarRow),
     live,
+    calibration: cal,
   };
   return { board, radar };
 }
