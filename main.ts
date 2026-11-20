@@ -42,13 +42,46 @@ if (!existsSync(inputFile)) {
 }
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
-const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
+/** Stop with a one-line reason and a distinct exit code: 2 input, 1 board or output. */
+function fail(code: number, message: string): never {
+  process.stderr.write(`token radar: ${message}\n`);
+  process.exit(code);
+}
+
+let snapshot;
+try {
+  snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
+} catch (e) {
+  fail(2, `cannot read the snapshot at ${inputFile}: ${e instanceof Error ? e.message : String(e)}`);
+}
+
+/**
+ * Input integrity. Refuse what would corrupt the ranking (a repeated slug, a watchlist slug the snapshot
+ * does not carry, a TVL that is not a positive number); report, without refusing, what only weakens it.
+ */
+function inputIssues(s: typeof snapshot): { fatal: string[]; notes: string[] } {
+  const fatal: string[] = [];
+  const notes: string[] = [];
+  const seen = new Set<string>();
+  for (const p of s.protocols) {
+    if (seen.has(p.slug)) fatal.push(`slug ${p.slug} appears twice`);
+    seen.add(p.slug);
+    if (!(p.tvl_usd > 0)) fatal.push(`${p.slug} has TVL ${p.tvl_usd}`);
+    if (p.change_7d === null) notes.push(`${p.slug} has no 7-day change`);
+  }
+  for (const w of s.watchlist) if (!seen.has(w)) fatal.push(`watchlist slug ${w} is not among the protocols`);
+  if (new Set(s.watchlist).size !== s.watchlist.length) fatal.push('the watchlist repeats a slug');
+  const bearing = s.protocols.filter((p) => p.mcap_usd !== null && p.mcap_usd > 0 && p.tvl_usd > 0).length;
+  if (bearing < 30) notes.push(`only ${bearing} token-bearing protocols to calibrate on: the residual band falls back to its published constants`);
+  return { fatal, notes };
+}
+const found = inputIssues(snapshot);
+if (found.fatal.length > 0) fail(2, `the snapshot is unusable: ${found.fatal.slice(0, 5).join('; ')}${found.fatal.length > 5 ? ` (and ${found.fatal.length - 5} more)` : ''}`);
+if (found.notes.length > 0) process.stderr.write(`token radar: note: ${found.notes.length} input note${found.notes.length === 1 ? '' : 's'}, first: ${found.notes[0]}\n`);
+
 const { board, radar } = buildRadar(snapshot);
 const issue = boardIssue(board, snapshot);
-if (issue !== null) {
-  process.stderr.write(`token radar: the model wrote a board the gate refuses: ${issue}\n`);
-  process.exit(1);
-}
+if (issue !== null) fail(1, `the model wrote a board the gate refuses: ${issue}`);
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
@@ -85,7 +118,61 @@ for (const name of shots) {
 // The dossier is written last: the scorer rebuilds it from this /output and compares bytes.
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
 
+/**
+ * Output verification: read back what was written, not what is in memory, and refuse a hand-in the
+ * sealed gate would refuse. Checks the board file against the snapshot, the dashboard for network use,
+ * the screenshots' PNG/JPEG signatures and size caps, and that dossier.json equals a fresh build.
+ */
+function outputIssues(): string[] {
+  const bad: string[] = [];
+  let written: { rows?: Array<Record<string, unknown>> };
+  try {
+    written = JSON.parse(readFileSync(join(out, 'board.json'), 'utf8'));
+  } catch {
+    return ['board.json is not valid JSON after writing'];
+  }
+  const rows = written.rows ?? [];
+  if (statSync(join(out, 'board.json')).size > 8 * 1024 * 1024) bad.push('board.json is over 8 MiB');
+  if (rows.length < 100 || rows.length > 4000) bad.push(`board.json holds ${rows.length} rows, the gate wants 100 to 4000`);
+  const known = new Set(snapshot.protocols.map((p) => p.slug));
+  const slugs = new Set<string>();
+  for (const r of rows) {
+    const slug = String(r.slug);
+    if (!known.has(slug)) bad.push(`board.json names ${slug}, which the snapshot does not carry`);
+    if (slugs.has(slug)) bad.push(`board.json repeats ${slug}`);
+    slugs.add(slug);
+    if (typeof r.name !== 'string' || r.name.trim() === '') bad.push(`${slug} has no name`);
+    if (/\s/.test(slug) || slug.length < 1 || slug.length > 128) bad.push(`${slug} is not a valid slug`);
+  }
+  for (const w of snapshot.watchlist) if (!slugs.has(w)) bad.push(`the written board misses watchlist slug ${w}`);
+
+  const NETWORK = /(?:https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}|\bfetch\s*\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon|@import/i;
+  for (const name of readdirSync(join(out, 'dashboard'))) {
+    const text = readFileSync(join(out, 'dashboard', name), 'utf8');
+    const hit = NETWORK.exec(text);
+    if (hit !== null) bad.push(`dashboard/${name} reaches for the network: ${hit[0]}`);
+  }
+  const dataText = readFileSync(join(out, 'data.js'), 'utf8');
+  if (!dataText.startsWith('window.RADAR=')) bad.push('data.js does not set window.RADAR');
+
+  for (const name of readdirSync(join(out, 'screenshots'))) {
+    const buf = readFileSync(join(out, 'screenshots', name));
+    const png = buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const jpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    if (!png && !jpeg) bad.push(`screenshots/${name} is neither a PNG nor a JPEG`);
+    if (buf.length > SCREENSHOT_CAPS.max_bytes) bad.push(`screenshots/${name} is ${buf.length} bytes, over the ${SCREENSHOT_CAPS.max_bytes} cap`);
+  }
+
+  const dossierBytes = readFileSync(join(out, 'dossier.json'));
+  const fresh = buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } });
+  if (Buffer.compare(dossierBytes, Buffer.from(fresh)) !== 0) bad.push('dossier.json differs from a fresh buildDossier of the written output');
+  if (dossierBytes.length > 1_572_864) bad.push('dossier.json is over 1.5 MiB');
+  return bad;
+}
+const outputProblems = outputIssues();
+if (outputProblems.length > 0) fail(1, `the written output fails verification: ${outputProblems.slice(0, 5).join('; ')}${outputProblems.length > 5 ? ` (and ${outputProblems.length - 5} more)` : ''}`);
+
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside), output verified\n` +
     `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );

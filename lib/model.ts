@@ -312,8 +312,42 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
   return `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`;
 }
 
+/** Which chain to start on, from the chains the snapshot lists for the protocol (DefiLlama's own order). */
+export function chainStep(p: SnapshotProtocol, chain: string): FarmStep {
+  if (p.chains.length > 1) {
+    const shown = p.chains.slice(0, 3).join(', ');
+    const more = p.chains.length > 3 ? ` and ${p.chains.length - 3} more` : '';
+    return {
+      text: `${p.name} counts its TVL on ${p.chains.length} chains (${shown}${more}). DefiLlama lists ${chain} first, so open the position there and compare fees on the others before you bridge.`,
+      cost: 'about $4 of gas, plus bridge fees if you move chains',
+      time: '10 minutes',
+    };
+  }
+  return {
+    text: `${p.name} counts its TVL on ${chain} alone, so there is no chain to choose. Confirm the app's network setting matches ${chain} before you sign.`,
+    cost: 'no fee to check',
+    time: '2 minutes',
+  };
+}
+
+/** How to pace the entry, from the protocol's 7-day TVL change and its age. Context for the reader, not a valuation input. */
+export function trendStep(p: SnapshotProtocol, age: number | null): FarmStep {
+  const tracked = age === null ? '' : ` DefiLlama has tracked it for ${age} days with no token on record.`;
+  const c = p.change_7d;
+  if (c === null) {
+    return { text: `DefiLlama reports no 7-day TVL change for ${p.name}, so read its TVL chart yourself before you size the position.${tracked}`, cost: 'no fee to check', time: '5 minutes' };
+  }
+  if (c >= 10) {
+    return { text: `TVL rose ${c.toFixed(1)}% in 7 days. Enter in two halves a week apart instead of all at once, since fresh inflows can change a pool's terms.${tracked}`, cost: 'gas for a second deposit, about $4', time: '2 deposits, 7 days apart' };
+  }
+  if (c <= -10) {
+    return { text: `TVL fell ${Math.abs(c).toFixed(1)}% in 7 days. Read the protocol's own announcements for the cause before you deposit, and start with half of the amount.${tracked}`, cost: 'no fee to check', time: '15 minutes' };
+  }
+  return { text: `TVL moved ${c.toFixed(1)}% in 7 days, a steady record, so a single entry is enough.${tracked}`, cost: 'no extra cost', time: 'no extra time' };
+}
+
 /**
- * A protocol's farm plan: six steps, each an action with a cost and a time. The plan is derived from
+ * A protocol's farm plan: eight steps, each an action with a cost and a time. The plan is derived from
  * the protocol's own record (category, chains, TVL, age), never from a hand-written list of names.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
@@ -332,11 +366,13 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
       cost: `$${capital} of capital and about $${capital >= 150 ? 8 : 4} of gas`,
       time: '15 minutes to set up',
     },
+    chainStep(p, chain),
     {
       text: `Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.`,
       cost: 'about $2 of gas a week',
       time: '10 minutes a week',
     },
+    trendStep(p, age),
     {
       text: `Hold the position for at least ${hold} days so the activity is counted in more than one snapshot.`,
       cost: `the $${capital} stays in the position`,

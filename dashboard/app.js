@@ -90,6 +90,22 @@
     if (s.length < 20) s = s + " Hold the position and check the protocol's own page.";
     return s;
   }
+  function chainStep(p, chain) {
+    if (p.chains && p.chains.length > 1) {
+      var shown = p.chains.slice(0, 3).join(', ');
+      var more = p.chains.length > 3 ? ' and ' + (p.chains.length - 3) + ' more' : '';
+      return { text: p.name + ' counts its TVL on ' + p.chains.length + ' chains (' + shown + more + '). DefiLlama lists ' + chain + ' first, so open the position there and compare fees on the others before you bridge.', cost: 'about $4 of gas, plus bridge fees if you move chains', time: '10 minutes' };
+    }
+    return { text: p.name + ' counts its TVL on ' + chain + ' alone, so there is no chain to choose. Confirm the app\'s network setting matches ' + chain + ' before you sign.', cost: 'no fee to check', time: '2 minutes' };
+  }
+  function trendStep(p) {
+    var tracked = (p.age_days === null || p.age_days === undefined) ? '' : ' DefiLlama has tracked it for ' + p.age_days + ' days with no token on record.';
+    var c = p.change_7d;
+    if (c === null || c === undefined) return { text: 'DefiLlama reports no 7-day TVL change for ' + p.name + ', so read its TVL chart yourself before you size the position.' + tracked, cost: 'no fee to check', time: '5 minutes' };
+    if (c >= 10) return { text: 'TVL rose ' + c.toFixed(1) + "% in 7 days. Enter in two halves a week apart instead of all at once, since fresh inflows can change a pool's terms." + tracked, cost: 'gas for a second deposit, about $4', time: '2 deposits, 7 days apart' };
+    if (c <= -10) return { text: 'TVL fell ' + Math.abs(c).toFixed(1) + "% in 7 days. Read the protocol's own announcements for the cause before you deposit, and start with half of the amount." + tracked, cost: 'no fee to check', time: '15 minutes' };
+    return { text: 'TVL moved ' + c.toFixed(1) + '% in 7 days, a steady record, so a single entry is enough.' + tracked, cost: 'no extra cost', time: 'no extra time' };
+  }
   function farmSteps(p) {
     var chain = chainOf(p);
     var capital = capitalFor(p);
@@ -97,7 +113,9 @@
     return [
       { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
       { text: actionFor(p, capital, chain), cost: '$' + capital + ' of capital and about $' + (capital >= 150 ? 8 : 4) + ' of gas', time: '15 minutes to set up' },
+      chainStep(p, chain),
       { text: 'Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.', cost: 'about $2 of gas a week', time: '10 minutes a week' },
+      trendStep(p),
       { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
       { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
       { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' }
@@ -286,7 +304,8 @@
       el('div', { class: 'formula' },
         'implied = round( exp( ' + m.intercept + ' + ' + m.slope + ' x log(max(tvl_usd, ' + m.tvl_floor + ')) ) )'
       ),
-      el('p', { class: 'sub', text: 'TVL comes from the snapshot. The coefficients are the audit\'s log-log fit on this snapshot\'s token-bearing protocols; every row uses the same function, no protocol name is special-cased. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' })
+      el('p', { class: 'sub', text: 'TVL comes from the snapshot. The coefficients are the audit\'s log-log fit on this snapshot\'s token-bearing protocols; every row uses the same function, no protocol name is special-cased. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' }),
+      el('p', { class: 'sub', text: 'The 7-day TVL change and the protocol\'s age are supporting indicators. They are not parameters of Model E: they do not move implied value or rank. They feed the signal score and the entry pacing in each farm plan. The signal score is not an airdrop probability.' })
     );
   }
 
