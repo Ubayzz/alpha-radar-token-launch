@@ -384,6 +384,11 @@
       el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
       el('p', { class: 'sub', text: 'Low and high scale the model value by exp(P25) and exp(P75) of the log residuals from the ' + DATA.calibration.n + ' token-bearing protocols in this snapshot (Model E band). Model E leave-one-out refit: within 2× of the true value ' + DATA.calibration.e_loo_within_2x_pct + '% of the time, inside the P25–P75 band ' + DATA.calibration.e_loo_p25_p75_cov_pct + '% of the time, mean absolute log error ' + DATA.calibration.e_loo_mae_log.toFixed(3) + '.' })
     ));
+    dialog.appendChild(el('section', { class: 'detail-section risk-section' },
+      el('h3', { text: 'Risk profile' }),
+      el('p', { class: 'sub', text: 'Data-derived ' + row.risk_level + ' risk context. These flags describe where the snapshot or calibration is thin; they do not change rank or imply token issuance.' }),
+      row.risk_flags.length ? el('ul', { class: 'risk-flags' }, row.risk_flags.map(function (flag) { return el('li', { text: flag }); })) : el('p', { class: 'sub', text: 'No additional snapshot risk flags were raised for this protocol.' })
+    ));
     dialog.appendChild(farmSimulator(row));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
