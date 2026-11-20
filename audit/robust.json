@@ -1,0 +1,21 @@
+{
+  "n": 94,
+  "E_full_fit": {
+    "intercept": 8.998,
+    "slope_on_log_tvl": 0.405
+  },
+  "E_vs_A": {
+    "mean_improvement_mae_log": 0.197,
+    "ci95": [
+      0.025,
+      0.382
+    ]
+  },
+  "F_vs_A": {
+    "mean_improvement_mae_log": 0.189,
+    "ci95": [
+      0.007,
+      0.381
+    ]
+  }
+}

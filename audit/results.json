@@ -1,0 +1,98 @@
+{
+  "n": 94,
+  "loo": {
+    "A fixed 0.25 x TVL": {
+      "n": 94,
+      "mae_log": 1.716,
+      "med_ae_log": 1.468,
+      "within_2x_pct": 30.9,
+      "p25_p75_cov_pct": 48.9
+    },
+    "B global median ratio": {
+      "n": 94,
+      "mae_log": 1.737,
+      "med_ae_log": 1.526,
+      "within_2x_pct": 29.8,
+      "p25_p75_cov_pct": 48.9
+    },
+    "C current (median ratio x growth x maturity)": {
+      "n": 94,
+      "mae_log": 1.736,
+      "med_ae_log": 1.482,
+      "within_2x_pct": 33,
+      "p25_p75_cov_pct": 48.9
+    },
+    "D category shrinkage k=5": {
+      "n": 94,
+      "mae_log": 1.769,
+      "med_ae_log": 1.613,
+      "within_2x_pct": 24.5,
+      "p25_p75_cov_pct": 43.6
+    },
+    "E log-log: ltvl": {
+      "n": 94,
+      "mae_log": 1.519,
+      "med_ae_log": 1.295,
+      "within_2x_pct": 36.2,
+      "p25_p75_cov_pct": 47.9
+    },
+    "F log-log: ltvl + age + chains": {
+      "n": 94,
+      "mae_log": 1.527,
+      "med_ae_log": 1.164,
+      "within_2x_pct": 38.3,
+      "p25_p75_cov_pct": 48.9
+    },
+    "G log-log: ltvl + age + chains + growth": {
+      "n": 94,
+      "mae_log": 1.554,
+      "med_ae_log": 1.255,
+      "within_2x_pct": 36.2,
+      "p25_p75_cov_pct": 48.9
+    }
+  },
+  "repeated_5fold": {
+    "A fixed 0.25 x TVL": {
+      "mae_log": 1.716,
+      "med_ae_log": 1.468,
+      "within_2x_pct": 30.9,
+      "p25_p75_cov_pct": 48.295
+    },
+    "B global median ratio": {
+      "mae_log": 1.739,
+      "med_ae_log": 1.548,
+      "within_2x_pct": 29.105,
+      "p25_p75_cov_pct": 48.295
+    },
+    "C current (median ratio x growth x maturity)": {
+      "mae_log": 1.739,
+      "med_ae_log": 1.506,
+      "within_2x_pct": 30.69,
+      "p25_p75_cov_pct": 48.345
+    },
+    "D category shrinkage k=5": {
+      "mae_log": 1.777,
+      "med_ae_log": 1.637,
+      "within_2x_pct": 24.2,
+      "p25_p75_cov_pct": 43.34
+    },
+    "E log-log: ltvl": {
+      "mae_log": 1.525,
+      "med_ae_log": 1.287,
+      "within_2x_pct": 35.095,
+      "p25_p75_cov_pct": 47.76
+    },
+    "F log-log: ltvl + age + chains": {
+      "mae_log": 1.549,
+      "med_ae_log": 1.195,
+      "within_2x_pct": 35.32,
+      "p25_p75_cov_pct": 46.85
+    },
+    "G log-log: ltvl + age + chains + growth": {
+      "mae_log": 1.581,
+      "med_ae_log": 1.235,
+      "within_2x_pct": 33.675,
+      "p25_p75_cov_pct": 46.055
+    }
+  }
+}
