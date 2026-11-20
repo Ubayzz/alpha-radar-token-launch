@@ -29,11 +29,8 @@
   // The model in one function: the page recomputes a row from the snapshot figures and checks the
   // number board.json carries, so the page's code and the board's data are visibly the same arithmetic.
   function impliedOf(row, model) {
-    var growth = Math.min(model.growth_cap, Math.max(model.growth_floor, row.change_7d === null || row.change_7d === undefined ? 0 : row.change_7d));
-    var growthMult = 1 + (growth / 100) * model.growth_weight;
-    var age = row.age_days === null || row.age_days === undefined ? model.unknown_age_days : row.age_days;
-    var maturity = model.maturity_floor + (Math.min(Math.max(age, 0), model.maturity_days) / model.maturity_days) * model.maturity_range;
-    return Math.max(1, Math.round(row.tvl_usd * model.base_multiple * growthMult * maturity));
+    var tvl = Math.max(model.tvl_floor, row.tvl_usd);
+    return Math.max(1, Math.round(Math.exp(model.intercept + model.slope * Math.log(tvl))));
   }
 
   function el(tag, attrs) {
@@ -287,9 +284,9 @@
       el('h2', { text: 'How implied value is computed' }),
       el('p', { class: 'sub', text: 'Every row is scored by one function of the snapshot figures. No protocol name is special-cased, and no row is hand-picked.' }),
       el('div', { class: 'formula' },
-        'implied = round( tvl_usd x ' + m.base_multiple + ' x (1 + clamp(change_7d, ' + m.growth_floor + ', ' + m.growth_cap + ') / 100 x ' + m.growth_weight + ') x (' + m.maturity_floor + ' + min(age_days, ' + m.maturity_days + ') / ' + m.maturity_days + ' x ' + m.maturity_range + ') )'
+        'implied = round( exp( ' + m.intercept + ' + ' + m.slope + ' x log(max(tvl_usd, ' + m.tvl_floor + ')) ) )'
       ),
-      el('p', { class: 'sub', text: 'TVL and seven-day growth come from the snapshot. Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses ' + m.unknown_age_days + ' days. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' })
+      el('p', { class: 'sub', text: 'TVL comes from the snapshot. The coefficients are the audit\'s log-log fit on this snapshot\'s token-bearing protocols; every row uses the same function, no protocol name is special-cased. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' })
     );
   }
 
@@ -352,10 +349,7 @@
       el('h3', { text: 'Implied value' }),
       el('div', { class: 'equation' },
         el('div', null, el('span', { text: 'TVL' }), el('b', { class: 'num', text: fmtUsd(row.tvl_usd) })),
-        el('div', null, el('span', { text: 'Seven-day growth' }), el('b', { class: 'num', text: fmtPct(row.change_7d) })),
-        el('div', null, el('span', { text: 'Age with no token' }), el('b', { class: 'num', text: fmtAge(row.age_days) })),
-        el('div', null, el('span', { text: 'Growth multiplier' }), el('b', { class: 'num', text: String(row.growth_multiplier) })),
-        el('div', null, el('span', { text: 'Maturity multiplier' }), el('b', { class: 'num', text: String(row.maturity_multiplier) })),
+        el('div', null, el('span', { text: 'log(TVL)' }), el('b', { class: 'num', text: String(row.log_tvl) })),
         el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) }))
       ),
       el('p', { class: 'sub', text: 'Model ' + DATA.model_version + ': the same function scores every protocol. The page recomputes this row as ' + fmtUsd(impliedOf(row, DATA.model)) + (impliedOf(row, DATA.model) === row.implied_value_usd ? ', the same number board.json carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
@@ -363,13 +357,13 @@
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Sensitivity range and signal' }),
       el('div', { class: 'equation' },
-        el('div', null, el('span', { text: 'Low (P25 of token ratios)' }), el('b', { class: 'num', text: fmtUsd(row.implied_low_usd) })),
+        el('div', null, el('span', { text: 'Low (exp P25 residual)' }), el('b', { class: 'num', text: fmtUsd(row.implied_low_usd) })),
         el('div', null, el('span', { text: 'Mid (model)' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
-        el('div', null, el('span', { text: 'High (P75 of token ratios)' }), el('b', { class: 'num', text: fmtUsd(row.implied_high_usd) })),
+        el('div', null, el('span', { text: 'High (exp P75 residual)' }), el('b', { class: 'num', text: fmtUsd(row.implied_high_usd) })),
         el('div', null, el('span', { text: 'Signal score (0-100)' }), el('b', { class: 'num', text: String(row.signal_score) }))
       ),
       el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
-      el('p', { class: 'sub', text: 'Low and high come from the spread of market cap to TVL among protocols that already have a token in this snapshot (' + DATA.calibration.n + ' protocols). Leave-one-out tests of that spread covered the true ratio ' + DATA.calibration.loo_coverage_pct + '% of the time inside P25 to P75, and within 2x of the median ' + DATA.calibration.loo_within_2x_pct + '% of the time. The band is wide because the spread is wide.' })
+      el('p', { class: 'sub', text: 'Low and high scale the model value by exp(P25) and exp(P75) of the log residuals from the ' + DATA.calibration.n + ' token-bearing protocols in this snapshot (Model E band). The leave-one-out ratio evaluation is kept separate: it covered the true ratio ' + DATA.calibration.loo_coverage_pct + '% of the time inside P25 to P75, and within 2x of the median ' + DATA.calibration.loo_within_2x_pct + '% of the time.' })
     ));
     dialog.appendChild(farmSimulator(row));
     dialog.appendChild(el('section', { class: 'detail-section' },

@@ -6,16 +6,13 @@
 // snapshot's live-token protocols are kept apart and shown as the market's own values, never mixed into
 // the ranked board.
 //
-// Implied value follows only from the snapshot's own figures:
+// Implied value follows only from the snapshot's own figures (Model E, log-log TVL):
 //
-//   base       = tvl_usd x BASE_MULTIPLE
-//   growth     = clamp(change_7d, -60, 120) per cent
-//   growthMult = 1 + (growth / 100) x GROWTH_WEIGHT
-//   maturity   = 0.6 + min(age_days, 1095) / 1095 x 0.4   (age_days unknown: 365)
-//   implied    = max(1, round(base x growthMult x maturity))
+//   log_implied = 8.998 + 0.405 x log(max(tvl_usd, tvl_floor))
+//   implied     = max(1, round(exp(log_implied)))
+//   low / high  = implied x exp(P25 / P75 of the fit's log residuals)
 //
-// The constants are the house model's, stated in the dashboard and changeable in the model sandbox. No
-// protocol name is ever special-cased: the same function scores every row.
+// The coefficients are the audit's full fit on the sealed snapshot's token-bearing protocols
 
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
 export interface SnapshotProtocol {
@@ -40,31 +37,21 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-/** The model's constants, as the dashboard states them and the sandbox may change them. */
+/** The model's constants: the log-log coefficients and a minimum TVL floor for the log. */
 export interface ModelConstants {
-  base_multiple: number;
-  growth_weight: number;
-  growth_floor: number;
-  growth_cap: number;
-  maturity_floor: number;
-  maturity_range: number;
-  maturity_days: number;
-  unknown_age_days: number;
+  intercept: number;
+  slope: number;
+  tvl_floor: number; // protocols below this get the floor value, not log(0)
 }
 
 export const MODEL: ModelConstants = {
-  base_multiple: 0.25,
-  growth_weight: 0.5,
-  growth_floor: -60,
-  growth_cap: 120,
-  maturity_floor: 0.6,
-  maturity_range: 0.4,
-  maturity_days: 1095,
-  unknown_age_days: 365,
+  intercept: 8.998,
+  slope: 0.405,
+  tvl_floor: 1,
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'alpha-radar-2';
+export const MODEL_VERSION = 'alpha-radar-3';
 
 /** How many pre-token protocols below the watchlist floor the early radar carries, by TVL. */
 export const EARLY_ROWS = 400;
@@ -103,11 +90,11 @@ export interface BoardRow {
   signal_score: number;
   signal_note: string;
   model: {
-    base_multiple: number;
-    growth_pct: number;
-    growth_multiplier: number;
-    maturity_multiplier: number;
-    age_days: number | null;
+    intercept: number;
+    slope: number;
+    log_tvl: number;
+    low_factor: number;
+    high_factor: number;
   };
   farm_steps: string[];
 }
@@ -129,8 +116,9 @@ export interface RadarRow {
   implied_high_usd: number;
   signal_score: number;
   signal_note: string;
-  growth_multiplier: number;
-  maturity_multiplier: number;
+  log_tvl: number;
+  low_factor: number;
+  high_factor: number;
 }
 
 /** A live-token protocol: it already trades, so the board shows the market's own value, not a model's. */
@@ -184,17 +172,14 @@ export function ageDays(asOf: string, listedAt: string | null): number | null {
   return Math.max(0, Math.floor((a - b) / DAY_MS));
 }
 
-/** The three multipliers and the implied value one protocol gets under `model`. */
-export function impliedValue(protocol: SnapshotProtocol, asOf: string, model: ModelConstants): { implied: number; growthPct: number; growthMult: number; maturityMult: number; age: number | null } {
+/** The implied value one protocol gets under Model E: exp(intercept + slope * log(tvl)). */
+export function impliedValue(protocol: SnapshotProtocol, asOf: string, model: ModelConstants): { implied: number; logTvl: number; age: number | null } {
   const age = ageDays(asOf, protocol.listed_at);
-  const rawGrowth = finite(protocol.change_7d, 0);
-  const growthPct = Math.min(model.growth_cap, Math.max(model.growth_floor, rawGrowth));
-  const growthMult = 1 + (growthPct / 100) * model.growth_weight;
-  const ageForModel = age ?? model.unknown_age_days;
-  const maturityMult = model.maturity_floor + (Math.min(Math.max(ageForModel, 0), model.maturity_days) / model.maturity_days) * model.maturity_range;
-  const base = protocol.tvl_usd * model.base_multiple;
-  const implied = Math.max(1, Math.round(base * growthMult * maturityMult));
-  return { implied, growthPct, growthMult, maturityMult, age };
+  const tvl = Math.max(model.tvl_floor, protocol.tvl_usd);
+  const logTvl = Math.log(tvl);
+  const logImplied = model.intercept + model.slope * logTvl;
+  const implied = Math.max(1, Math.round(Math.exp(logImplied)));
+  return { implied, logTvl, age };
 }
 
 /** DefiLlama's version-marker rule: a name ending in a release is a pool of another protocol. */
@@ -242,10 +227,11 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, ca
   for (const p of early) chosen.set(p.slug, p);
 
   const scored = [...chosen.values()].map((p) => {
-    const { implied, growthPct, growthMult, maturityMult, age } = impliedValue(p, snapshot.as_of, model);
+    const { implied, logTvl, age } = impliedValue(p, snapshot.as_of, model);
     const sig = signalScore(p, age);
-    const scale = implied / model.base_multiple;
-    return { p, implied, growthPct, growthMult, maturityMult, age, sig, lo: Math.max(1, Math.round(scale * cal.q25)), hi: Math.max(1, Math.round(scale * cal.q75)) };
+    const lo = Math.max(1, Math.round(implied * cal.low_factor));
+    const hi = Math.max(1, Math.round(implied * cal.high_factor));
+    return { p, implied, logTvl, age, sig, lo, hi };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   return scored.map((s, i) => ({
@@ -268,11 +254,11 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, ca
     signal_score: s.sig.score,
     signal_note: s.sig.note,
     model: {
-      base_multiple: model.base_multiple,
-      growth_pct: s.growthPct,
-      growth_multiplier: round4(s.growthMult),
-      maturity_multiplier: round4(s.maturityMult),
-      age_days: s.age,
+      intercept: model.intercept,
+      slope: model.slope,
+      log_tvl: round4(s.logTvl),
+      low_factor: round4(cal.low_factor),
+      high_factor: round4(cal.high_factor),
     },
     farm_steps: farmSteps(s.p, s.age).map(stepText),
   }));
@@ -404,15 +390,15 @@ export function radarRow(row: BoardRow): RadarRow {
     implied_high_usd: row.implied_high_usd,
     signal_score: row.signal_score,
     signal_note: row.signal_note,
-    growth_multiplier: row.model.growth_multiplier,
-    maturity_multiplier: row.model.maturity_multiplier,
+    log_tvl: row.model.log_tvl,
+    low_factor: row.model.low_factor,
+    high_factor: row.model.high_factor,
   };
 }
 
 /** Everything the dashboard renders, from the snapshot. */
 export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): { board: BoardRow[]; radar: RadarData } {
-  const cal = calibrate(snapshot.protocols);
-  model = { ...model, base_multiple: Math.round(cal.median * 1e4) / 1e4 };
+  const cal = calibrate(snapshot.protocols, model.intercept, model.slope);
   const board = buildBoard(snapshot, model, cal);
   const live = liveRows(snapshot);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
