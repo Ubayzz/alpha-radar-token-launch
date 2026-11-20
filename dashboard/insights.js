@@ -40,20 +40,23 @@
       metric('RANKED PROTOCOLS', number(data.board_size), sample ? 'Sample view · ' + data.rows.length + ' loaded' : 'Snapshot coverage · scored', 'metric-primary'),
       metric('CORE WATCHLIST', number(data.watchlist_size), 'Full watchlist accounted for', ''),
       metric('EARLY RADAR', number(data.early_size), 'Below watchlist TVL floor', ''),
-      metric('LEAVE-ONE-OUT · WITHIN 2×', percent(data.calibration && data.calibration.loo_within_2x_pct), 'Model uncertainty · not accuracy guarantee', 'metric-caution')
+      metric('MODEL E · WITHIN 2×', percent(data.calibration && data.calibration.e_loo_within_2x_pct), 'Leave-one-out · not an accuracy guarantee', 'metric-caution')
     );
     if (title) title.insertAdjacentElement('afterend', kpis);
 
     const row = el('div', 'insight-grid'); row.id = 'radar-coverage';
     const confidence = mkPanel('model-evidence', 'MODEL VALIDATION', 'Transparent about uncertainty');
     const one = el('div','validation-row');
-    one.append(el('span','','Within 2× in leave-one-out'),el('strong','',percent(data.calibration && data.calibration.loo_within_2x_pct)));
-    const track = el('div','validation-track'); const fill = el('span',''); fill.style.width = safePct(data.calibration && data.calibration.loo_within_2x_pct) + '%'; track.append(fill);
+    one.append(el('span','','Within 2× in leave-one-out'),el('strong','',percent(data.calibration && data.calibration.e_loo_within_2x_pct)));
+    const track = el('div','validation-track'); const fill = el('span',''); fill.style.width = safePct(data.calibration && data.calibration.e_loo_within_2x_pct) + '%'; track.append(fill);
     const two = el('div','validation-row small');
-    two.append(el('span','','P25–P75 coverage'),el('strong','',percent(data.calibration && data.calibration.loo_coverage_pct)));
-    const track2 = el('div','validation-track faint'); const fill2 = el('span',''); fill2.style.width = safePct(data.calibration && data.calibration.loo_coverage_pct) + '%'; track2.append(fill2);
+    two.append(el('span','','P25–P75 coverage'),el('strong','',percent(data.calibration && data.calibration.e_loo_p25_p75_cov_pct)));
+    const track2 = el('div','validation-track faint'); const fill2 = el('span',''); fill2.style.width = safePct(data.calibration && data.calibration.e_loo_p25_p75_cov_pct) + '%'; track2.append(fill2);
     confidence.append(one,track,two,track2);
-    const note = el('p','validation-note', 'Single-snapshot model. Backtests are not evidence of future token issuance.'); confidence.append(note);
+    const mae = el('div','validation-row small');
+    mae.append(el('span','','Mean absolute error (log)'),el('strong','', (data.calibration && Number.isFinite(Number(data.calibration.e_loo_mae_log))) ? Number(data.calibration.e_loo_mae_log).toFixed(3) : 'N/A'));
+    confidence.append(mae);
+    const note = el('p','validation-note', 'Model E, leave-one-out on the snapshot\'s token-bearing protocols. Single-snapshot backtest, not evidence of future token issuance.'); confidence.append(note);
 
     const coverage = mkPanel('pipeline-overview', 'DATA COVERAGE', 'One snapshot, separate populations');
     const overview = el('div','coverage-stats');

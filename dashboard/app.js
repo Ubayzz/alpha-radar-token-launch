@@ -363,7 +363,7 @@
         el('div', null, el('span', { text: 'Signal score (0-100)' }), el('b', { class: 'num', text: String(row.signal_score) }))
       ),
       el('p', { class: 'sub', text: 'Signals: ' + row.signal_note + '. The score is a weighted count of record features, not a probability. It has no outcome data behind it and is not calibrated.' }),
-      el('p', { class: 'sub', text: 'Low and high scale the model value by exp(P25) and exp(P75) of the log residuals from the ' + DATA.calibration.n + ' token-bearing protocols in this snapshot (Model E band). The leave-one-out ratio evaluation is kept separate: it covered the true ratio ' + DATA.calibration.loo_coverage_pct + '% of the time inside P25 to P75, and within 2x of the median ' + DATA.calibration.loo_within_2x_pct + '% of the time.' })
+      el('p', { class: 'sub', text: 'Low and high scale the model value by exp(P25) and exp(P75) of the log residuals from the ' + DATA.calibration.n + ' token-bearing protocols in this snapshot (Model E band). Model E leave-one-out refit: within 2× of the true value ' + DATA.calibration.e_loo_within_2x_pct + '% of the time, inside the P25–P75 band ' + DATA.calibration.e_loo_p25_p75_cov_pct + '% of the time, mean absolute log error ' + DATA.calibration.e_loo_mae_log.toFixed(3) + '.' })
     ));
     dialog.appendChild(farmSimulator(row));
     dialog.appendChild(el('section', { class: 'detail-section' },

@@ -16,13 +16,18 @@ export interface Calibration {
   residual_p75: number; // P75 of the same residuals, log space
   low_factor: number; // exp(residual_p25)
   high_factor: number; // exp(residual_p75)
-  // Out-of-sample baseline ratio evaluation, kept separate from Model E's fit.
+  // Out-of-sample evaluation of the baseline ratio model, kept separate from Model E.
   q25: number;
   median: number;
   q75: number;
-  loo_coverage_pct: number; // share of protocols whose true ratio fell inside the LOO P25-P75 band
-  loo_within_2x_pct: number; // share whose true ratio was within 2x of the LOO median
+  loo_coverage_pct: number; // baseline ratio: true ratio inside the LOO P25-P75 band
+  loo_within_2x_pct: number; // baseline ratio: true ratio within 2x of the LOO median
   loo_median_abs_log_err: number;
+  // Out-of-sample evaluation of Model E itself (leave-one-out refit of the log-log fit).
+  e_loo_mae_log: number;
+  e_loo_med_ae_log: number;
+  e_loo_within_2x_pct: number;
+  e_loo_p25_p75_cov_pct: number;
 }
 
 const EXCLUDED = new Set(['CEX', 'Bridge', 'Canonical Bridge', 'Liquid Staking', 'Liquid Restaking', 'Restaked BTC']);
@@ -75,6 +80,10 @@ export function calibrate(protocols: SnapshotProtocol[], intercept: number = E_I
       loo_coverage_pct: 0,
       loo_within_2x_pct: 0,
       loo_median_abs_log_err: 0,
+      e_loo_mae_log: 0,
+      e_loo_med_ae_log: 0,
+      e_loo_within_2x_pct: 0,
+      e_loo_p25_p75_cov_pct: 0,
     };
   }
 
@@ -95,6 +104,35 @@ export function calibrate(protocols: SnapshotProtocol[], intercept: number = E_I
   }
   errs.sort((a, b) => a - b);
   const pct = (x: number) => Math.round((x / ratios.length) * 1000) / 10;
+
+  // Model E evaluated out of sample: leave-one-out refit of the log-log fit on the same protocols,
+  // matching the audit's Model E procedure exactly (coefficients refit per fold).
+  const pts = usable.map((p) => ({ y: Math.log(p.mcap_usd!), x: Math.log(p.tvl_usd) }));
+  const eErrs: number[] = [];
+  let eCover = 0;
+  let eWithin = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const tr = pts.filter((_, j) => j !== i);
+    const n = tr.length;
+    const sx = tr.reduce((s, q) => s + q.x, 0);
+    const sy = tr.reduce((s, q) => s + q.y, 0);
+    const sxx = tr.reduce((s, q) => s + q.x * q.x, 0);
+    const sxy = tr.reduce((s, q) => s + q.x * q.y, 0);
+    const den = n * sxx - sx * sx;
+    const b = den === 0 ? 0 : (n * sxy - sx * sy) / den;
+    const a = (sy - b * sx) / n;
+    const res = tr.map((q) => q.y - (a + b * q.x)).sort((p, q) => p - q);
+    const lo = quantile(res, 0.25);
+    const hi = quantile(res, 0.75);
+    const r = pts[i]!.y - (a + b * pts[i]!.x);
+    const e = Math.abs(r);
+    eErrs.push(e);
+    if (r >= lo && r <= hi) eCover++;
+    if (e < Math.log(2)) eWithin++;
+  }
+  eErrs.sort((a, b) => a - b);
+  const ePct = (x: number) => Math.round((x / pts.length) * 1000) / 10;
+
   return {
     n: sorted.length,
     intercept,
@@ -109,5 +147,9 @@ export function calibrate(protocols: SnapshotProtocol[], intercept: number = E_I
     loo_coverage_pct: pct(cover),
     loo_within_2x_pct: pct(within),
     loo_median_abs_log_err: Math.round(quantile(errs, 0.5) * 1000) / 1000,
+    e_loo_mae_log: Math.round((eErrs.reduce((s, e) => s + e, 0) / eErrs.length) * 1000) / 1000,
+    e_loo_med_ae_log: Math.round(quantile(eErrs, 0.5) * 1000) / 1000,
+    e_loo_within_2x_pct: ePct(eWithin),
+    e_loo_p25_p75_cov_pct: ePct(eCover),
   };
 }
