@@ -17,6 +17,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { boardIssue, buildRadar, dataScript, parseSnapshot } from './lib/model.ts';
+import { crossCheck } from './lib/consistency.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -82,6 +83,13 @@ if (found.notes.length > 0) process.stderr.write(`token radar: note: ${found.not
 const { board, radar } = buildRadar(snapshot);
 const issue = boardIssue(board, snapshot);
 if (issue !== null) fail(1, `the model wrote a board the gate refuses: ${issue}`);
+
+// Cross-check board, dashboard data and formula before anything is written: a disagreement here would
+// put a number on the page that board.json does not carry.
+const consistency = crossCheck(board, radar, snapshot);
+if (consistency.failures.length > 0) {
+  fail(1, `board, dashboard data and model disagree (${consistency.failures.length} of ${consistency.checks} checks): ${consistency.failures.slice(0, 3).join('; ')}`);
+}
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
@@ -173,6 +181,6 @@ const outputProblems = outputIssues();
 if (outputProblems.length > 0) fail(1, `the written output fails verification: ${outputProblems.slice(0, 5).join('; ')}${outputProblems.length > 5 ? ` (and ${outputProblems.length - 5} more)` : ''}`);
 
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside), output verified\n` +
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside), output verified, ${consistency.checks} consistency checks passed\n` +
     `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );

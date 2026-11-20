@@ -61,7 +61,8 @@ export const LIVE_ROWS = 24;
 
 /** A farm step: the action, what it costs, and how long it takes. */
 import { signalScore } from './signal.ts';
-import { calibrate, type Calibration } from './calibrate.ts';
+import { calibrate, EXCLUDED, type Calibration } from './calibrate.ts';
+import { riskContext, riskProfile, type RiskLevel } from './risk.ts';
 
 export interface FarmStep {
   text: string;
@@ -89,6 +90,8 @@ export interface BoardRow {
   implied_high_usd: number;
   signal_score: number;
   signal_note: string;
+  risk_level: RiskLevel;
+  risk_flags: string[];
   model: {
     intercept: number;
     slope: number;
@@ -116,6 +119,8 @@ export interface RadarRow {
   implied_high_usd: number;
   signal_score: number;
   signal_note: string;
+  risk_level: RiskLevel;
+  risk_flags: string[];
   log_tvl: number;
   low_factor: number;
   high_factor: number;
@@ -226,12 +231,14 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, ca
     .slice(0, EARLY_ROWS);
   for (const p of early) chosen.set(p.slug, p);
 
+  const ctx = riskContext(snapshot.protocols, EXCLUDED);
   const scored = [...chosen.values()].map((p) => {
     const { implied, logTvl, age } = impliedValue(p, snapshot.as_of, model);
     const sig = signalScore(p, age);
+    const risk = riskProfile(p, age, ctx);
     const lo = Math.max(1, Math.round(implied * cal.low_factor));
     const hi = Math.max(1, Math.round(implied * cal.high_factor));
-    return { p, implied, logTvl, age, sig, lo, hi };
+    return { p, implied, logTvl, age, sig, risk, lo, hi };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   return scored.map((s, i) => ({
@@ -253,6 +260,8 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL, ca
     implied_high_usd: s.hi,
     signal_score: s.sig.score,
     signal_note: s.sig.note,
+    risk_level: s.risk.level,
+    risk_flags: s.risk.flags,
     model: {
       intercept: model.intercept,
       slope: model.slope,
@@ -426,6 +435,8 @@ export function radarRow(row: BoardRow): RadarRow {
     implied_high_usd: row.implied_high_usd,
     signal_score: row.signal_score,
     signal_note: row.signal_note,
+    risk_level: row.risk_level,
+    risk_flags: row.risk_flags,
     log_tvl: row.model.log_tvl,
     low_factor: row.model.low_factor,
     high_factor: row.model.high_factor,

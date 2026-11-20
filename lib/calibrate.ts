@@ -30,7 +30,7 @@ export interface Calibration {
   e_loo_p25_p75_cov_pct: number;
 }
 
-const EXCLUDED = new Set(['CEX', 'Bridge', 'Canonical Bridge', 'Liquid Staking', 'Liquid Restaking', 'Restaked BTC']);
+export const EXCLUDED = new Set(['CEX', 'Bridge', 'Canonical Bridge', 'Liquid Staking', 'Liquid Restaking', 'Restaked BTC']);
 
 /** The audit's coefficients, also the fallback when too few token-bearing protocols exist. */
 export const E_INTERCEPT = 8.998;
