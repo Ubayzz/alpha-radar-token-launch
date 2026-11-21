@@ -1,8 +1,8 @@
 # Alpha Radar
 
 [![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
-[![rank](https://make.fun/badge/token-radar-01/Ubayzz/alpha-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
-[![reward](https://make.fun/badge/token-radar-01/Ubayzz/alpha-radar/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/Ubayzz/alpha-radar-token-launch/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/Ubayzz/alpha-radar-token-launch/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
 An offline token-launch radar for make.fun's Token Launch Radar bounty. It ranks pre-token protocols from the sealed snapshot with a cross-validated log-log TVL model, shows calibrated uncertainty bands, documents data-derived risk context, and gives each row a concrete farming plan without claiming token probabilities.
 
